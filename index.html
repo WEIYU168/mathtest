@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>因式分解大作戰 (輕鬆版)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #1a472a, #0d2b18);
+            overflow: hidden;
+        }
+
+        #game-container::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 15px solid #8b4513;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            color: white;
+            z-index: 5;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+
+        .stat-box {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        #question-board {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            padding: 15px 40px;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 32px;
+            font-family: 'Courier New', monospace;
+            z-index: 4;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .sup {
+            vertical-align: super;
+            font-size: smaller;
+        }
+
+        #canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: white;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #f1c40f;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        p {
+            font-size: 20px;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            max-width: 600px;
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            font-weight: bold;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            background: #2ecc71;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        .float-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 24px;
+            pointer-events: none;
+            animation: floatUp 1.5s ease-out forwards; /* 動畫時間稍微拉長 */
+            z-index: 6;
+            text-shadow: 1px 1px 2px black;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-50px); opacity: 0; }
+        }
+
+        #mobile-controls {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.5);
+            font-size: 14px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 768px) {
+            #mobile-controls { display: block; }
+            #question-board { font-size: 24px; width: 80%; }
+            h1 { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="ui-layer">
+        <div class="stat-box">分數: <span id="score">0</span></div>
+    </div>
+
+    <div id="question-board">
+        準備中...
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <div id="mobile-controls">左右滑動螢幕來移動籃子</div>
+
+    <!-- 開始畫面 -->
+    <div id="start-screen">
+        <h1>因式分解大作戰<br><span style="font-size: 0.6em; color: #2ecc71;">(輕鬆版)</span></h1>
+        <p>
+            題目會出現在上方黑板 (例如：x<span class="sup">2</span> + 5x + 6)<br>
+            你需要控制籃子接住正確的因式 (例如：x+2 和 x+3)<br><br>
+            <span style="color:#2ecc71">接對 +100分</span><br>
+            <span style="color:#e74c3c">漏接正確答案 -100分</span><br>
+            <span style="color:#f39c12">接錯 -50分</span>
+        </p>
+        <button onclick="startGame()">開始遊戲</button>
+    </div>
+
+    <!-- 遊戲結束畫面 -->
+    <div id="game-over-screen" style="display: none;">
+        <h1>遊戲結束</h1>
+        <p>你的最終分數是：<span id="final-score" style="color:#f1c40f; font-size: 36px;">0</span></p>
+        <button onclick="startGame()">再玩一次</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const questionBoard = document.getElementById('question-board');
+    const startScreen = document.getElementById('start-screen');
+    const gameOverScreen = document.getElementById('game-over-screen');
+    const container = document.getElementById('game-container');
+
+    let gameRunning = false;
+    let score = 0;
+    let items = [];
+    let currentProblem = null;
+    let lastTime = 0;
+    let difficultyMultiplier = 1;
+    let foundFactorsCount = 0;
+    
+    // 玩家設定
+    const player = {
+        x: 0,
+        y: 0,
+        width: 100,
+        height: 60,
+        speed: 0
+    };
+
+    function resize() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        player.y = canvas.height - 100;
+        player.x = canvas.width / 2 - player.width / 2;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let mouseX = canvas.width / 2;
+    function updateInput(e) {
+        if (!gameRunning) return;
+        let clientX;
+        if (e.type.startsWith('touch')) {
+            clientX = e.touches[0].clientX;
+        } else {
+            clientX = e.clientX;
+        }
+        mouseX = Math.max(player.width/2, Math.min(canvas.width - player.width/2, clientX));
+        player.x = mouseX - player.width / 2;
+    }
+    window.addEventListener('mousemove', updateInput);
+    window.addEventListener('touchmove', updateInput, {passive: false});
+    window.addEventListener('touchstart', updateInput, {passive: false});
+
+    function generateProblem() {
+        // x^2 + bx + c = (x + m)(x + n)
+        let m = Math.floor(Math.random() * 19) - 9; 
+        let n = Math.floor(Math.random() * 19) - 9;
+        
+        if (m === 0) m = 1;
+        if (n === 0) n = 2;
+
+        const b = m + n;
+        const c = m * n;
+
+        let bStr = b === 0 ? "" : (b > 0 ? `+ ${b === 1 ? '' : b}x` : `- ${Math.abs(b) === 1 ? '' : Math.abs(b)}x`);
+        if (b === 0 && c < 0) bStr = "";
+        let cStr = c === 0 ? "" : (c > 0 ? `+ ${c}` : `- ${Math.abs(c)}`);
+        
+        const questionText = `x<span class="sup">2</span> ${bStr} ${cStr}`;
+        const ans1 = `(x ${m >= 0 ? '+' : '-'} ${Math.abs(m)})`;
+        const ans2 = `(x ${n >= 0 ? '+' : '-'} ${Math.abs(n)})`;
+
+        return {
+            html: questionText,
+            answers: [ans1, ans2],
+            roots: [m, n]
+        };
+    }
+
+    class Item {
+        constructor(text, isCorrect) {
+            this.text = text;
+            this.isCorrect = isCorrect;
+            this.width = 120;
+            this.height = 50;
+            this.x = Math.random() * (canvas.width - this.width);
+            this.y = -60;
+            
+            // --- 速度調整區 ---
+            // 舊速度公式: (Math.random() * 2 + 2)
+            // 新速度公式: (Math.random() * 1.5 + 1) => 範圍 1.0 ~ 2.5 像素/幀
+            this.speed = (Math.random() * 1.5 + 1.0) * difficultyMultiplier; 
+            
+            this.markedForDeletion = false;
+        }
+
+        update() {
+            this.y += this.speed;
+
+            if (this.y > canvas.height) {
+                this.markedForDeletion = true;
+                if (this.isCorrect) {
+                    updateScore(-100, this.x, canvas.height - 20, "漏接!");
+                    checkLevelProgress(false);
+                }
+            }
+
+            if (
+                this.x < player.x + player.width &&
+                this.x + this.width > player.x &&
+                this.y < player.y + player.height &&
+                this.y + this.height > player.y
+            ) {
+                this.markedForDeletion = true;
+                if (this.isCorrect) {
+                    updateScore(100, this.x, this.y, "+100");
+                    checkLevelProgress(true);
+                } else {
+                    updateScore(-50, this.x, this.y, "-50");
+                }
+            }
+        }
+
+        draw() {
+            ctx.fillStyle = '#34495e';
+            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#bdc3c7';
+            ctx.strokeRect(this.x, this.y, this.width, this.height);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 20px "Courier New"';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(this.text, this.x + this.width / 2, this.y + this.height / 2);
+        }
+    }
+
+    function checkLevelProgress(caughtCorrectly) {
+        if (caughtCorrectly) {
+            foundFactorsCount++;
+        }
+        if (foundFactorsCount >= 2) {
+            setTimeout(() => {
+                startNewLevel();
+            }, 500);
+        }
+    }
+
+    function startNewLevel() {
+        items = [];
+        foundFactorsCount = 0;
+        // --- 難度調整區 ---
+        // 降低難度增加的速度，最高速度倍率降為 2.0 (原本 2.5)
+        difficultyMultiplier = Math.min(2.0, 1 + (score / 3000)); 
+        currentProblem = generateProblem();
+        questionBoard.innerHTML = `分解: ${currentProblem.html}`;
+    }
+
+    function spawnItemLogic() {
+        // --- 生成頻率調整區 ---
+        // 0.02 -> 0.015 (降低生成機率，讓畫面不那麼擁擠)
+        if (Math.random() < 0.015) { 
+            let text = "";
+            let isCorrect = false;
+            const needCorrect = Math.random() < 0.4; // 稍微提高正確答案出現比例，補償變慢的節奏
+
+            if (needCorrect) {
+                text = currentProblem.answers[Math.floor(Math.random() * currentProblem.answers.length)];
+                isCorrect = true;
+            } else {
+                let m = currentProblem.roots[0];
+                let n = currentProblem.roots[1];
+                let fakeNum;
+                do {
+                    fakeNum = Math.floor(Math.random() * 19) - 9;
+                } while (fakeNum === m || fakeNum === n || fakeNum === 0);
+                text = `(x ${fakeNum >= 0 ? '+' : '-'} ${Math.abs(fakeNum)})`;
+                isCorrect = false;
+            }
+            items.push(new Item(text, isCorrect));
+        }
+    }
+
+    function updateScore(val, x, y, label) {
+        score += val;
+        scoreEl.innerText = score;
+        const el = document.createElement('div');
+        el.className = 'float-text';
+        el.innerText = label;
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        if (val > 0) el.style.color = '#2ecc71'; 
+        else if (val == -50) el.style.color = '#f39c12'; 
+        else el.style.color = '#e74c3c'; 
+        container.appendChild(el);
+        setTimeout(() => el.remove(), 1500); // 延長浮動文字時間
+    }
+
+    function drawPlayer() {
+        ctx.fillStyle = '#e67e22';
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(player.x + player.width, player.y);
+        ctx.lineTo(player.x + player.width - 10, player.y + player.height);
+        ctx.lineTo(player.x + 10, player.y + player.height);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#d35400';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = 'white';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText("接這裡", player.x + player.width/2, player.y + 35);
+    }
+
+    function loop(timestamp) {
+        if (!gameRunning) return;
+        const deltaTime = timestamp - lastTime;
+        lastTime = timestamp;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        spawnItemLogic();
+        items.forEach(item => item.update());
+        items = items.filter(item => !item.markedForDeletion);
+        items.forEach(item => item.draw());
+        drawPlayer();
+        requestAnimationFrame(loop);
+    }
+
+    function startGame() {
+        score = 0;
+        scoreEl.innerText = "0";
+        items = [];
+        difficultyMultiplier = 1;
+        startScreen.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        gameRunning = true;
+        resize();
+        startNewLevel();
+        requestAnimationFrame(loop);
+    }
+</script>
+
+</body>
+</html>
